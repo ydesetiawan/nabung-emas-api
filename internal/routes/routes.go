@@ -2,18 +2,21 @@ package routes
 
 import (
 	"database/sql"
+	"time"
 
-	"github.com/labstack/echo/v4"
 	"nabung-emas-api/internal/config"
 	"nabung-emas-api/internal/handlers"
 	"nabung-emas-api/internal/middleware"
 	"nabung-emas-api/internal/repositories"
 	"nabung-emas-api/internal/services"
+
+	"github.com/labstack/echo/v4"
 )
 
 func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
+	tokenBlacklistRepo := repositories.NewTokenBlacklistRepository(db)
 	typePocketRepo := repositories.NewTypePocketRepository(db)
 	pocketRepo := repositories.NewPocketRepository(db)
 	transactionRepo := repositories.NewTransactionRepository(db)
@@ -21,7 +24,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	settingsRepo := repositories.NewSettingsRepository(db)
 
 	// Initialize services
-	authService := services.NewAuthService(userRepo, cfg)
+	authService := services.NewAuthService(userRepo, tokenBlacklistRepo, cfg)
 	userService := services.NewUserService(userRepo)
 	typePocketService := services.NewTypePocketService(typePocketRepo)
 	pocketService := services.NewPocketService(pocketRepo, typePocketRepo)
@@ -39,7 +42,11 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 
 	// Initialize auth middleware
-	authMiddleware := middleware.NewAuthMiddleware(cfg)
+	authMiddleware := middleware.NewAuthMiddleware(cfg, tokenBlacklistRepo)
+
+	// Initialize and start cleanup service for token blacklist
+	cleanupService := services.NewCleanupService(tokenBlacklistRepo)
+	cleanupService.StartTokenCleanup(24 * time.Hour) // Run cleanup once per day
 
 	// API v1 group
 	api := e.Group("/api/v1")
@@ -52,7 +59,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 		auth.POST("/forgot-password", authHandler.ForgotPassword)
 		auth.POST("/reset-password", authHandler.ResetPassword)
 		auth.POST("/refresh", authHandler.RefreshToken)
-		
+
 		// Protected auth routes
 		auth.POST("/logout", authHandler.Logout, authMiddleware.RequireAuth)
 		auth.GET("/me", authHandler.GetCurrentUser, authMiddleware.RequireAuth)

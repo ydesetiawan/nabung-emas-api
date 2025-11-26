@@ -4,17 +4,23 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/labstack/echo/v4"
 	"nabung-emas-api/internal/config"
+	"nabung-emas-api/internal/repositories"
 	"nabung-emas-api/internal/utils"
+
+	"github.com/labstack/echo/v4"
 )
 
 type AuthMiddleware struct {
-	config *config.Config
+	config             *config.Config
+	tokenBlacklistRepo *repositories.TokenBlacklistRepository
 }
 
-func NewAuthMiddleware(cfg *config.Config) *AuthMiddleware {
-	return &AuthMiddleware{config: cfg}
+func NewAuthMiddleware(cfg *config.Config, tokenBlacklistRepo *repositories.TokenBlacklistRepository) *AuthMiddleware {
+	return &AuthMiddleware{
+		config:             cfg,
+		tokenBlacklistRepo: tokenBlacklistRepo,
+	}
 }
 
 func (m *AuthMiddleware) RequireAuth(next echo.HandlerFunc) echo.HandlerFunc {
@@ -31,6 +37,15 @@ func (m *AuthMiddleware) RequireAuth(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		tokenString := parts[1]
+
+		// Check if token is blacklisted
+		isBlacklisted, err := m.tokenBlacklistRepo.IsBlacklisted(tokenString)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "Failed to verify token")
+		}
+		if isBlacklisted {
+			return echo.NewHTTPError(http.StatusUnauthorized, "Token has been revoked")
+		}
 
 		// Validate token
 		claims, err := utils.ValidateToken(tokenString, m.config.JWTSecret)

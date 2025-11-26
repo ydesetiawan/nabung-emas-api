@@ -46,7 +46,10 @@ db-reset: db-drop db-create migrate ## Reset database (drop, create, migrate)
 
 migrate: ## Run database migrations
 	@echo "🔄 Running migrations..."
-	psql -d nabung_emas -f migrations/001_initial_schema.sql
+	@for file in migrations/*.sql; do \
+		echo "Running $$file..."; \
+		psql -d nabung_emas -f $$file; \
+	done
 	@echo "✅ Migrations complete!"
 
 dev: ## Run with hot reload (requires air)

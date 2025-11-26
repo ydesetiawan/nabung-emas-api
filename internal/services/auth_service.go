@@ -6,17 +6,20 @@ import (
 	"nabung-emas-api/internal/models"
 	"nabung-emas-api/internal/repositories"
 	"nabung-emas-api/internal/utils"
+	"time"
 )
 
 type AuthService struct {
-	userRepo *repositories.UserRepository
-	config   *config.Config
+	userRepo           *repositories.UserRepository
+	tokenBlacklistRepo *repositories.TokenBlacklistRepository
+	config             *config.Config
 }
 
-func NewAuthService(userRepo *repositories.UserRepository, cfg *config.Config) *AuthService {
+func NewAuthService(userRepo *repositories.UserRepository, tokenBlacklistRepo *repositories.TokenBlacklistRepository, cfg *config.Config) *AuthService {
 	return &AuthService{
-		userRepo: userRepo,
-		config:   cfg,
+		userRepo:           userRepo,
+		tokenBlacklistRepo: tokenBlacklistRepo,
+		config:             cfg,
 	}
 }
 
@@ -158,4 +161,18 @@ func (s *AuthService) ResetPassword(token, newPassword string) error {
 	// TODO: Validate reset token and update password
 	// For now, return not implemented error
 	return errors.New("password reset not yet implemented")
+}
+
+func (s *AuthService) Logout(accessToken string, userID string) error {
+	// Validate the token to get its expiration time
+	claims, err := utils.ValidateToken(accessToken, s.config.JWTSecret)
+	if err != nil {
+		// Even if token is invalid/expired, we still want to blacklist it
+		// Use a default expiration time
+		expiresAt := time.Now().Add(s.config.JWTExpiry)
+		return s.tokenBlacklistRepo.Add(accessToken, userID, expiresAt)
+	}
+
+	// Add token to blacklist with its actual expiration time
+	return s.tokenBlacklistRepo.Add(accessToken, claims.UserID, claims.ExpiresAt.Time)
 }

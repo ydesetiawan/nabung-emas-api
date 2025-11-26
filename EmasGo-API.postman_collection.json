@@ -162,6 +162,21 @@
                 },
                 {
                     "name": "Logout",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    pm.environment.unset(\"access_token\");",
+                                    "    pm.environment.unset(\"refresh_token\");",
+                                    "    console.log(\"Tokens cleared after logout\");",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
                     "request": {
                         "method": "POST",
                         "header": [

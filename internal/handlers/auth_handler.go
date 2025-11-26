@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/labstack/echo/v4"
 	"nabung-emas-api/internal/middleware"
 	"nabung-emas-api/internal/models"
 	"nabung-emas-api/internal/services"
 	"nabung-emas-api/internal/utils"
+
+	"github.com/labstack/echo/v4"
 )
 
 type AuthHandler struct {
@@ -98,8 +100,30 @@ func (h *AuthHandler) RefreshToken(c echo.Context) error {
 }
 
 func (h *AuthHandler) Logout(c echo.Context) error {
-	// In a stateless JWT system, logout is handled client-side
-	// Optionally, you can implement token blacklisting here
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return utils.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized")
+	}
+
+	// Extract the token from the Authorization header
+	authHeader := c.Request().Header.Get("Authorization")
+	if authHeader == "" {
+		return utils.ErrorResponse(c, http.StatusUnauthorized, "Missing authorization header")
+	}
+
+	// Extract token from "Bearer <token>"
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return utils.ErrorResponse(c, http.StatusUnauthorized, "Invalid authorization header format")
+	}
+
+	accessToken := parts[1]
+
+	// Blacklist the token
+	if err := h.authService.Logout(accessToken, userID); err != nil {
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to logout")
+	}
+
 	return utils.SuccessResponse(c, http.StatusOK, "Logged out successfully", nil)
 }
 
