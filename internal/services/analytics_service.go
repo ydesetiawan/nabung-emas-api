@@ -8,12 +8,18 @@ import (
 type AnalyticsService struct {
 	analyticsRepo   *repositories.AnalyticsRepository
 	transactionRepo *repositories.TransactionRepository
+	pocketRepo      *repositories.PocketRepository
 }
 
-func NewAnalyticsService(analyticsRepo *repositories.AnalyticsRepository, transactionRepo *repositories.TransactionRepository) *AnalyticsService {
+func NewAnalyticsService(
+	analyticsRepo *repositories.AnalyticsRepository,
+	transactionRepo *repositories.TransactionRepository,
+	pocketRepo *repositories.PocketRepository,
+) *AnalyticsService {
 	return &AnalyticsService{
 		analyticsRepo:   analyticsRepo,
 		transactionRepo: transactionRepo,
+		pocketRepo:      pocketRepo,
 	}
 }
 
@@ -42,8 +48,14 @@ func (s *AnalyticsService) GetDashboard(userID string, currentGoldPrice *float64
 		return nil, err
 	}
 
+	topPockets, err := s.pocketRepo.GetTopPockets(userID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &models.DashboardSummary{
 		Portfolio:          *portfolio,
+		TopPockets:         topPockets,
 		RecentTransactions: recentTransactions,
 	}, nil
 }
@@ -121,7 +133,7 @@ func (s *AnalyticsService) GetTrends(userID string, period, groupBy string) (*mo
 	// TODO: Implement trend analytics with period and groupBy
 	// For now, return empty trends
 	return &models.TrendAnalytics{
-		Trends: []models.TrendData{},
+		Trends:  []models.TrendData{},
 		Summary: models.TrendsSummary{},
 	}, nil
 }

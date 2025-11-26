@@ -50,6 +50,58 @@ func (r *PocketRepository) Create(pocket *models.Pocket) error {
 	return err
 }
 
+func (r *PocketRepository) GetTopPockets(userID string) ([]models.Pocket, error) {
+	query := `
+		SELECT 
+			p.id, p.user_id, p.type_pocket_id, p.name, p.description,
+			p.aggregate_total_price, p.aggregate_total_weight, p.target_weight,
+			p.created_at, p.updated_at,
+			tp.id, tp.name, tp.icon, tp.color
+		FROM pockets p
+		LEFT JOIN type_pockets tp ON tp.id = p.type_pocket_id
+		WHERE p.user_id = $1
+		ORDER BY p.aggregate_total_weight DESC
+		LIMIT 3
+	`
+
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var pockets []models.Pocket
+	for rows.Next() {
+		var p models.Pocket
+		var tp models.TypePocket
+
+		err := rows.Scan(
+			&p.ID,
+			&p.UserID,
+			&p.TypePocketID,
+			&p.Name,
+			&p.Description,
+			&p.AggregateTotalPrice,
+			&p.AggregateTotalWeight,
+			&p.TargetWeight,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+			&tp.ID,
+			&tp.Name,
+			&tp.Icon,
+			&tp.Color,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		p.TypePocket = &tp
+		pockets = append(pockets, p)
+	}
+
+	return pockets, nil
+}
+
 func (r *PocketRepository) FindAll(userID string, typePocketID *string, page, limit int, sortBy, sortOrder string) ([]models.Pocket, int, error) {
 	// Count total
 	countQuery := `SELECT COUNT(*) FROM pockets WHERE user_id = $1`

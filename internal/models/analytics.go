@@ -1,14 +1,14 @@
 package models
 
 type PortfolioAnalytics struct {
-	TotalValue           float64                  `json:"total_value"`
-	TotalWeight          float64                  `json:"total_weight"`
-	AveragePricePerGram  float64                  `json:"average_price_per_gram"`
-	CurrentMarketPrice   *float64                 `json:"current_market_price,omitempty"`
-	CurrentValue         *float64                 `json:"current_value,omitempty"`
-	ProfitLoss           *float64                 `json:"profit_loss,omitempty"`
-	ProfitLossPercentage *float64                 `json:"profit_loss_percentage,omitempty"`
-	Distribution         []PocketDistribution     `json:"distribution"`
+	TotalValue           float64              `json:"total_value"`
+	TotalWeight          float64              `json:"total_weight"`
+	AveragePricePerGram  float64              `json:"average_price_per_gram"`
+	CurrentMarketPrice   *float64             `json:"current_market_price,omitempty"`
+	CurrentValue         *float64             `json:"current_value,omitempty"`
+	ProfitLoss           *float64             `json:"profit_loss,omitempty"`
+	ProfitLossPercentage *float64             `json:"profit_loss_percentage,omitempty"`
+	Distribution         []PocketDistribution `json:"distribution"`
 }
 
 type PocketDistribution struct {
@@ -22,10 +22,10 @@ type PocketDistribution struct {
 }
 
 type MonthlyPurchaseData struct {
-	Month              string  `json:"month"`
-	Weight             float64 `json:"weight"`
-	Amount             float64 `json:"amount"`
-	Count              int     `json:"count"`
+	Month               string  `json:"month"`
+	Weight              float64 `json:"weight"`
+	Amount              float64 `json:"amount"`
+	Count               int     `json:"count"`
 	AveragePricePerGram float64 `json:"average_price_per_gram"`
 }
 
@@ -58,17 +58,18 @@ type TrendAnalytics struct {
 }
 
 type TrendsSummary struct {
-	TotalWeight          float64 `json:"total_weight"`
-	TotalValue           float64 `json:"total_value"`
-	TransactionCount     int     `json:"transaction_count"`
-	AveragePricePerGram  float64 `json:"average_price_per_gram"`
-	LowestPricePerGram   float64 `json:"lowest_price_per_gram"`
-	HighestPricePerGram  float64 `json:"highest_price_per_gram"`
+	TotalWeight         float64 `json:"total_weight"`
+	TotalValue          float64 `json:"total_value"`
+	TransactionCount    int     `json:"transaction_count"`
+	AveragePricePerGram float64 `json:"average_price_per_gram"`
+	LowestPricePerGram  float64 `json:"lowest_price_per_gram"`
+	HighestPricePerGram float64 `json:"highest_price_per_gram"`
 }
 
 type DashboardSummary struct {
-	Portfolio           PortfolioSummary `json:"portfolio"`
-	RecentTransactions  []Transaction    `json:"recent_transactions"`
+	Portfolio          PortfolioSummary `json:"portfolio"`
+	TopPockets         []Pocket         `json:"top_pockets"`
+	RecentTransactions []Transaction    `json:"recent_transactions"`
 }
 
 type PortfolioSummary struct {

@@ -29,7 +29,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	typePocketService := services.NewTypePocketService(typePocketRepo)
 	pocketService := services.NewPocketService(pocketRepo, typePocketRepo)
 	transactionService := services.NewTransactionService(transactionRepo, pocketRepo)
-	analyticsService := services.NewAnalyticsService(analyticsRepo, transactionRepo)
+	analyticsService := services.NewAnalyticsService(analyticsRepo, transactionRepo, pocketRepo)
 	settingsService := services.NewSettingsService(settingsRepo)
 
 	// Initialize handlers
