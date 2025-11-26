@@ -29,7 +29,7 @@ func (r *AnalyticsRepository) GetPortfolioSummary(userID string) (*models.Portfo
 		LEFT JOIN pockets p ON p.user_id = u.id
 		LEFT JOIN transactions t ON t.user_id = u.id
 		WHERE u.id = $1
-		GROUP BY u.id
+		GROUP BY u.id, t.id
 	`
 
 	summary := &models.PortfolioSummary{}
