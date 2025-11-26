@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"nabung-emas-api/internal/models"
 	"nabung-emas-api/internal/repositories"
 )
@@ -92,6 +93,19 @@ func (s *PocketService) Update(id, userID string, req *models.UpdatePocketReques
 		pocket.TargetWeight = req.TargetWeight
 	}
 
+	if req.TypePocketID != "" {
+		log.Println("Type pocket ID updated:" + req.TypePocketID)
+		// Validate type pocket exists
+		exists, err := s.typePocketRepo.Exists(req.TypePocketID)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, errors.New("invalid type pocket ID")
+		}
+		pocket.TypePocketID = req.TypePocketID
+	}
+	log.Println("Type pocket all:" + pocket.TypePocketID)
 	if err := s.pocketRepo.Update(pocket); err != nil {
 		return nil, err
 	}

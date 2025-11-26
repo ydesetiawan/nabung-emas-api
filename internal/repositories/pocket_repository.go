@@ -250,8 +250,8 @@ func (r *PocketRepository) FindByID(id, userID string) (*models.Pocket, error) {
 func (r *PocketRepository) Update(pocket *models.Pocket) error {
 	query := `
 		UPDATE pockets
-		SET name = $1, description = $2, target_weight = $3, updated_at = $4
-		WHERE id = $5 AND user_id = $6
+		SET name = $1, description = $2, target_weight = $3, updated_at = $4, type_pocket_id = $5
+		WHERE id = $6 AND user_id = $7
 		RETURNING updated_at
 	`
 
@@ -261,6 +261,7 @@ func (r *PocketRepository) Update(pocket *models.Pocket) error {
 		pocket.Description,
 		pocket.TargetWeight,
 		time.Now(),
+		pocket.TypePocketID,
 		pocket.ID,
 		pocket.UserID,
 	).Scan(&pocket.UpdatedAt)
