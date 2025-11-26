@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"nabung-emas-api/internal/models"
+
+	"github.com/google/uuid"
 )
 
 type PocketRepository struct {
@@ -270,9 +271,18 @@ func (r *PocketRepository) GetStats(pocketID, userID string) (*models.PocketStat
 }
 
 func (r *PocketRepository) NameExistsForUser(userID, name, excludeID string) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM pockets WHERE user_id = $1 AND name = $2 AND id != $3)`
-	
+	var query string
+	var args []interface{}
+
+	if excludeID != "" {
+		query = `SELECT EXISTS(SELECT 1 FROM pockets WHERE user_id = $1 AND name = $2 AND id != $3)`
+		args = []interface{}{userID, name, excludeID}
+	} else {
+		query = `SELECT EXISTS(SELECT 1 FROM pockets WHERE user_id = $1 AND name = $2)`
+		args = []interface{}{userID, name}
+	}
+
 	var exists bool
-	err := r.db.QueryRow(query, userID, name, excludeID).Scan(&exists)
+	err := r.db.QueryRow(query, args...).Scan(&exists)
 	return exists, err
 }
