@@ -961,6 +961,175 @@
                     "response": []
                 }
             ]
+        },
+        {
+            "name": "Gold Scraper",
+            "item": [
+                {
+                    "name": "Scrape Gold Prices",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/gold-scraper/scrape",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "gold-scraper",
+                                "scrape"
+                            ]
+                        },
+                        "description": "Scrapes gold prices from logammulia.com and saves them to the database. Returns the scraped data with count of saved records."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Prices",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/gold-scraper/prices?limit=50",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "gold-scraper",
+                                "prices"
+                            ],
+                            "query": [
+                                {
+                                    "key": "limit",
+                                    "value": "50",
+                                    "description": "Limit number of results"
+                                },
+                                {
+                                    "key": "type",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "Filter by gold type (partial match)"
+                                },
+                                {
+                                    "key": "source",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "Filter by source (antam or usb)"
+                                }
+                            ]
+                        },
+                        "description": "Retrieves all gold prices with optional filters for type, source, and limit."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Prices - Filtered by Type",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/gold-scraper/prices?type=1 gram&limit=20",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "gold-scraper",
+                                "prices"
+                            ],
+                            "query": [
+                                {
+                                    "key": "type",
+                                    "value": "1 gram",
+                                    "description": "Filter by gold type (partial match)"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "20",
+                                    "description": "Limit number of results"
+                                }
+                            ]
+                        },
+                        "description": "Example: Get gold prices filtered by type '1 gram'"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Prices - Filtered by Source",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/gold-scraper/prices?source=antam&limit=30",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "gold-scraper",
+                                "prices"
+                            ],
+                            "query": [
+                                {
+                                    "key": "source",
+                                    "value": "antam",
+                                    "description": "Filter by source (antam or usb)"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "30",
+                                    "description": "Limit number of results"
+                                }
+                            ]
+                        },
+                        "description": "Example: Get gold prices filtered by source 'antam'"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Latest Prices",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/gold-scraper/prices/latest",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "gold-scraper",
+                                "prices",
+                                "latest"
+                            ]
+                        },
+                        "description": "Retrieves the latest price for each gold type. Returns the most recent scraped prices."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Price by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/gold-scraper/prices/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "gold-scraper",
+                                "prices",
+                                "1"
+                            ]
+                        },
+                        "description": "Retrieves a specific gold price by its ID. Replace '1' with the actual price ID."
+                    },
+                    "response": []
+                }
+            ]
         }
     ],
     "variable": [
