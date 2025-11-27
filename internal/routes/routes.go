@@ -22,6 +22,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	transactionRepo := repositories.NewTransactionRepository(db)
 	analyticsRepo := repositories.NewAnalyticsRepository(db)
 	settingsRepo := repositories.NewSettingsRepository(db)
+	goldPricingHistoryRepo := repositories.NewGoldPricingHistoryRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, tokenBlacklistRepo, cfg)
@@ -31,6 +32,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	transactionService := services.NewTransactionService(transactionRepo, pocketRepo)
 	analyticsService := services.NewAnalyticsService(analyticsRepo, transactionRepo, pocketRepo)
 	settingsService := services.NewSettingsService(settingsRepo)
+	goldScraperService := services.NewGoldScraperService(goldPricingHistoryRepo)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -40,6 +42,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
+	goldScraperHandler := handlers.NewGoldScraperHandler(goldScraperService)
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(cfg, tokenBlacklistRepo)
@@ -120,10 +123,12 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 		settings.PATCH("", settingsHandler.Update)
 	}
 
-	// Gold Price routes (can be public or protected based on requirements)
-	// goldPrice := api.Group("/gold-price")
-	// {
-	// 	goldPrice.GET("/current", goldPriceHandler.GetCurrent)
-	// 	goldPrice.GET("/history", goldPriceHandler.GetHistory)
-	// }
+	// Gold Scraper routes - Public access for scraping and viewing prices
+	goldScraper := api.Group("/gold-scraper")
+	{
+		goldScraper.POST("/scrape", goldScraperHandler.ScrapeGoldPrices)
+		goldScraper.GET("/prices", goldScraperHandler.GetAllPrices)
+		goldScraper.GET("/prices/latest", goldScraperHandler.GetLatestPrices)
+		goldScraper.GET("/prices/:id", goldScraperHandler.GetPriceByID)
+	}
 }

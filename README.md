@@ -10,6 +10,7 @@ A RESTful API backend for gold savings tracking application built with Go and Po
 - 📊 Transaction tracking with receipt uploads
 - 📈 Portfolio analytics and insights
 - 💵 Gold price tracking
+- 🕷️ **Gold Price Scraper** - Automated web scraping from logammulia.com
 - ⚙️ User settings management
 
 ## Tech Stack
@@ -19,6 +20,7 @@ A RESTful API backend for gold savings tracking application built with Go and Po
 - **Authentication:** JWT
 - **Validation:** go-playground/validator
 - **Password Hashing:** bcrypt
+- **Web Scraping:** Colly v2
 
 ## Prerequisites
 
@@ -194,6 +196,18 @@ psql -d nabung_emas -f migrations/002_your_migration_name.sql
 ### Settings
 - `GET /api/v1/settings` - Get user settings
 - `PATCH /api/v1/settings` - Update settings
+
+### Gold Scraper (NEW! 🕷️)
+- `POST /api/v1/gold-scraper/scrape` - Scrape gold prices from logammulia.com
+- `GET /api/v1/gold-scraper/prices` - Get all scraped prices (with filters)
+- `GET /api/v1/gold-scraper/prices/latest` - Get latest prices for each gold type
+- `GET /api/v1/gold-scraper/prices/:id` - Get price by ID
+
+**📚 Gold Scraper Documentation:**
+- [Quick Start Guide](./GOLD_SCRAPER_QUICKSTART.md)
+- [Complete API Documentation](./GOLD_SCRAPER_API.md)
+- [Implementation Summary](./GOLD_SCRAPER_SUMMARY.md)
+- [Visual Diagram](./GOLD_SCRAPER_DIAGRAM.md)
 
 ## Security Best Practices
 
