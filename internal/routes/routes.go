@@ -22,6 +22,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	transactionRepo := repositories.NewTransactionRepository(db)
 	analyticsRepo := repositories.NewAnalyticsRepository(db)
 	settingsRepo := repositories.NewSettingsRepository(db)
+	goldPricingHistoryRepo := repositories.NewGoldPricingHistoryRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, tokenBlacklistRepo, cfg)
@@ -31,6 +32,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	transactionService := services.NewTransactionService(transactionRepo, pocketRepo)
 	analyticsService := services.NewAnalyticsService(analyticsRepo, transactionRepo, pocketRepo)
 	settingsService := services.NewSettingsService(settingsRepo)
+	galeri24ScraperService := services.NewGaleri24ScraperService(goldPricingHistoryRepo)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -40,6 +42,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
+	galeri24ScraperHandler := handlers.NewGaleri24ScraperHandler(galeri24ScraperService)
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(cfg, tokenBlacklistRepo)
@@ -120,10 +123,15 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 		settings.PATCH("", settingsHandler.Update)
 	}
 
-	// Gold Price routes (can be public or protected based on requirements)
-	// goldPrice := api.Group("/gold-price")
-	// {
-	// 	goldPrice.GET("/current", goldPriceHandler.GetCurrent)
-	// 	goldPrice.GET("/history", goldPriceHandler.GetHistory)
-	// }
+	// Public routes - Galeri24 Gold Scraper
+	// Note: You may want to add authentication to the scrape endpoint in production
+	galeri24Scraper := api.Group("/galeri24-scraper")
+	{
+		galeri24Scraper.POST("/scrape", galeri24ScraperHandler.ScrapeGaleri24Prices)
+		galeri24Scraper.GET("/prices", galeri24ScraperHandler.GetAllPrices)
+		galeri24Scraper.GET("/prices/latest", galeri24ScraperHandler.GetLatestPrices)
+		galeri24Scraper.GET("/prices/:id", galeri24ScraperHandler.GetPriceByID)
+		galeri24Scraper.GET("/prices/date/:date", galeri24ScraperHandler.GetPricesByDate)
+		galeri24Scraper.GET("/stats", galeri24ScraperHandler.GetStats)
+	}
 }

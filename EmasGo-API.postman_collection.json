@@ -961,6 +961,269 @@
                     "response": []
                 }
             ]
+        },
+        {
+            "name": "Galeri24 Gold Scraper",
+            "item": [
+                {
+                    "name": "Scrape Galeri24 Prices",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/galeri24-scraper/scrape",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "galeri24-scraper",
+                                "scrape"
+                            ]
+                        },
+                        "description": "Scrapes gold prices from galeri24.co.id and saves them to the database. If data for the same date/type/source exists, it will be updated (no duplicates)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Prices",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/galeri24-scraper/prices?limit=100",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "galeri24-scraper",
+                                "prices"
+                            ],
+                            "query": [
+                                {
+                                    "key": "limit",
+                                    "value": "100",
+                                    "description": "Limit number of results"
+                                },
+                                {
+                                    "key": "offset",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "Offset for pagination"
+                                },
+                                {
+                                    "key": "type",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "Filter by gold type (e.g., '1', '10', '100')"
+                                },
+                                {
+                                    "key": "source",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "Filter by source (e.g., 'GALERI_24', 'ANTAM', 'UBS')"
+                                },
+                                {
+                                    "key": "start_date",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "Start date (YYYY-MM-DD)"
+                                },
+                                {
+                                    "key": "end_date",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "End date (YYYY-MM-DD)"
+                                }
+                            ]
+                        },
+                        "description": "Retrieves all gold prices with optional filters for type, source, date range, and pagination."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Prices - Filtered by Type",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/galeri24-scraper/prices?type=1&limit=50",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "galeri24-scraper",
+                                "prices"
+                            ],
+                            "query": [
+                                {
+                                    "key": "type",
+                                    "value": "1",
+                                    "description": "Filter by gold type (1 gram)"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "50",
+                                    "description": "Limit number of results"
+                                }
+                            ]
+                        },
+                        "description": "Example: Get gold prices filtered by type '1' (1 gram)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Prices - Filtered by Source",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/galeri24-scraper/prices?source=GALERI_24&limit=50",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "galeri24-scraper",
+                                "prices"
+                            ],
+                            "query": [
+                                {
+                                    "key": "source",
+                                    "value": "GALERI_24",
+                                    "description": "Filter by source (GALERI_24)"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "50",
+                                    "description": "Limit number of results"
+                                }
+                            ]
+                        },
+                        "description": "Example: Get gold prices filtered by source 'GALERI_24'"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Prices - Date Range",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/galeri24-scraper/prices?start_date=2025-11-01&end_date=2025-11-30&limit=100",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "galeri24-scraper",
+                                "prices"
+                            ],
+                            "query": [
+                                {
+                                    "key": "start_date",
+                                    "value": "2025-11-01",
+                                    "description": "Start date (YYYY-MM-DD)"
+                                },
+                                {
+                                    "key": "end_date",
+                                    "value": "2025-11-30",
+                                    "description": "End date (YYYY-MM-DD)"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "100",
+                                    "description": "Limit number of results"
+                                }
+                            ]
+                        },
+                        "description": "Example: Get gold prices for November 2025"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Latest Prices",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/galeri24-scraper/prices/latest",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "galeri24-scraper",
+                                "prices",
+                                "latest"
+                            ]
+                        },
+                        "description": "Retrieves the latest price for each gold type and source combination. Returns the most recent scraped prices."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Price by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/galeri24-scraper/prices/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "galeri24-scraper",
+                                "prices",
+                                "1"
+                            ]
+                        },
+                        "description": "Retrieves a specific gold price by its ID. Replace '1' with the actual price ID."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Prices by Date",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/galeri24-scraper/prices/date/2025-11-27",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "galeri24-scraper",
+                                "prices",
+                                "date",
+                                "2025-11-27"
+                            ]
+                        },
+                        "description": "Retrieves all gold prices for a specific date. Replace '2025-11-27' with the desired date (YYYY-MM-DD)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Statistics",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/galeri24-scraper/stats",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "galeri24-scraper",
+                                "stats"
+                            ]
+                        },
+                        "description": "Retrieves statistics about gold pricing data including total records, unique vendors, date ranges, etc."
+                    },
+                    "response": []
+                }
+            ]
         }
     ],
     "variable": [
