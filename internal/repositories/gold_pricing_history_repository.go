@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"nabung-emas-api/internal/models"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // GoldPricingHistoryRepository handles database operations for gold pricing histories
@@ -16,31 +19,74 @@ func NewGoldPricingHistoryRepository(db *sql.DB) *GoldPricingHistoryRepository {
 	return &GoldPricingHistoryRepository{db: db}
 }
 
-// Create inserts a new gold pricing history record into the database
+// calculateBuyPrice calculates the buy price as 94% of sell price (6% discount)
+func calculateBuyPrice(sellPrice string) string {
+	// Remove "Rp" and dots, keep only numbers
+	priceStr := strings.ReplaceAll(sellPrice, "Rp", "")
+	priceStr = strings.ReplaceAll(priceStr, ".", "")
+	priceStr = strings.TrimSpace(priceStr)
+
+	// Convert to float
+	price, err := strconv.ParseFloat(priceStr, 64)
+	if err != nil {
+		return sellPrice // Return original if parsing fails
+	}
+
+	// Calculate 94% (6% discount)
+	buyPrice := price * 0.94
+
+	// Format back to string with Rp prefix
+	buyPriceInt := int64(buyPrice)
+	buyPriceStr := fmt.Sprintf("%d", buyPriceInt)
+
+	// Add thousand separators
+	var result strings.Builder
+	result.WriteString("Rp")
+
+	for i, digit := range buyPriceStr {
+		if i > 0 && (len(buyPriceStr)-i)%3 == 0 {
+			result.WriteString(".")
+		}
+		result.WriteRune(digit)
+	}
+
+	return result.String()
+}
+
+// Create inserts a new gold pricing history record with UPSERT logic
 func (r *GoldPricingHistoryRepository) Create(data *models.GoldPricingHistoryCreate) (*models.GoldPricingHistory, error) {
+	buyPrice := calculateBuyPrice(data.SellPrice)
+
 	query := `
-		INSERT INTO gold_pricing_histories (gold_type, buy_price, sell_price, unit, source)
+		INSERT INTO gold_pricing_histories (pricing_date, gold_type, buy_price, sell_price, source)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, gold_type, buy_price, sell_price, unit, source, scraped_at, created_at
+		ON CONFLICT (pricing_date, gold_type, source) 
+		DO UPDATE SET 
+			buy_price = EXCLUDED.buy_price,
+			sell_price = EXCLUDED.sell_price,
+			scraped_at = CURRENT_TIMESTAMP,
+			updated_at = CURRENT_TIMESTAMP
+		RETURNING id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
 	`
 
 	var history models.GoldPricingHistory
 	err := r.db.QueryRow(
 		query,
+		data.PricingDate,
 		data.GoldType,
-		data.BuyPrice,
+		buyPrice,
 		data.SellPrice,
-		data.Unit,
 		data.Source,
 	).Scan(
 		&history.ID,
+		&history.PricingDate,
 		&history.GoldType,
 		&history.BuyPrice,
 		&history.SellPrice,
-		&history.Unit,
 		&history.Source,
 		&history.ScrapedAt,
 		&history.CreatedAt,
+		&history.UpdatedAt,
 	)
 
 	if err != nil {
@@ -50,70 +96,74 @@ func (r *GoldPricingHistoryRepository) Create(data *models.GoldPricingHistoryCre
 	return &history, nil
 }
 
-// CreateBatch inserts multiple gold pricing history records in a single transaction
-func (r *GoldPricingHistoryRepository) CreateBatch(data []models.GoldPricingHistoryCreate) ([]models.GoldPricingHistory, error) {
+// CreateBatch inserts multiple gold pricing history records with UPSERT logic
+func (r *GoldPricingHistoryRepository) CreateBatch(data []models.GoldPricingHistoryCreate) (int, int, error) {
 	if len(data) == 0 {
-		return []models.GoldPricingHistory{}, nil
+		return 0, 0, nil
 	}
 
 	// Start transaction
 	tx, err := r.db.Begin()
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+		return 0, 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
 	query := `
-		INSERT INTO gold_pricing_histories (gold_type, buy_price, sell_price, unit, source)
+		INSERT INTO gold_pricing_histories (pricing_date, gold_type, buy_price, sell_price, source)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, gold_type, buy_price, sell_price, unit, source, scraped_at, created_at
+		ON CONFLICT (pricing_date, gold_type, source) 
+		DO UPDATE SET 
+			buy_price = EXCLUDED.buy_price,
+			sell_price = EXCLUDED.sell_price,
+			scraped_at = CURRENT_TIMESTAMP,
+			updated_at = CURRENT_TIMESTAMP
+		RETURNING (xmax = 0) AS inserted
 	`
 
 	stmt, err := tx.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare statement: %w", err)
+		return 0, 0, fmt.Errorf("failed to prepare statement: %w", err)
 	}
 	defer stmt.Close()
 
-	histories := make([]models.GoldPricingHistory, 0, len(data))
+	savedCount := 0
+	updatedCount := 0
 
 	for _, item := range data {
-		var history models.GoldPricingHistory
+		buyPrice := calculateBuyPrice(item.SellPrice)
+
+		var inserted bool
 		err := stmt.QueryRow(
+			item.PricingDate,
 			item.GoldType,
-			item.BuyPrice,
+			buyPrice,
 			item.SellPrice,
-			item.Unit,
 			item.Source,
-		).Scan(
-			&history.ID,
-			&history.GoldType,
-			&history.BuyPrice,
-			&history.SellPrice,
-			&history.Unit,
-			&history.Source,
-			&history.ScrapedAt,
-			&history.CreatedAt,
-		)
+		).Scan(&inserted)
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to insert record: %w", err)
+			return 0, 0, fmt.Errorf("failed to insert/update record: %w", err)
 		}
 
-		histories = append(histories, history)
+		if inserted {
+			savedCount++
+		} else {
+			updatedCount++
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+		return 0, 0, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return histories, nil
+	return savedCount, updatedCount, nil
 }
 
 // GetAll retrieves gold pricing histories with optional filters
 func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFilter) ([]models.GoldPricingHistory, error) {
 	query := `
-		SELECT id, gold_type, buy_price, sell_price, unit, source, scraped_at, created_at
+		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
 		FROM gold_pricing_histories
 		WHERE 1=1
 	`
@@ -134,8 +184,27 @@ func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFi
 		argCount++
 	}
 
-	// Order by scraped_at descending (latest first)
-	query += " ORDER BY scraped_at DESC"
+	if filter.StartDate != nil {
+		query += fmt.Sprintf(" AND pricing_date >= $%d", argCount)
+		args = append(args, *filter.StartDate)
+		argCount++
+	}
+
+	if filter.EndDate != nil {
+		query += fmt.Sprintf(" AND pricing_date <= $%d", argCount)
+		args = append(args, *filter.EndDate)
+		argCount++
+	}
+
+	// Order by pricing_date descending (latest first)
+	query += " ORDER BY pricing_date DESC, gold_type ASC"
+
+	// Add offset
+	if filter.Offset > 0 {
+		query += fmt.Sprintf(" OFFSET $%d", argCount)
+		args = append(args, filter.Offset)
+		argCount++
+	}
 
 	// Add limit
 	if filter.Limit > 0 {
@@ -155,13 +224,14 @@ func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFi
 		var history models.GoldPricingHistory
 		err := rows.Scan(
 			&history.ID,
+			&history.PricingDate,
 			&history.GoldType,
 			&history.BuyPrice,
 			&history.SellPrice,
-			&history.Unit,
 			&history.Source,
 			&history.ScrapedAt,
 			&history.CreatedAt,
+			&history.UpdatedAt,
 		)
 
 		if err != nil {
@@ -178,13 +248,13 @@ func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFi
 	return histories, nil
 }
 
-// GetLatest retrieves the latest price for each gold type
+// GetLatest retrieves the latest price for each gold type and source
 func (r *GoldPricingHistoryRepository) GetLatest() ([]models.GoldPricingHistory, error) {
 	query := `
 		SELECT DISTINCT ON (gold_type, source) 
-			id, gold_type, buy_price, sell_price, unit, source, scraped_at, created_at
+			id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
 		FROM gold_pricing_histories
-		ORDER BY gold_type, source, scraped_at DESC
+		ORDER BY gold_type, source, pricing_date DESC
 	`
 
 	rows, err := r.db.Query(query)
@@ -199,13 +269,14 @@ func (r *GoldPricingHistoryRepository) GetLatest() ([]models.GoldPricingHistory,
 		var history models.GoldPricingHistory
 		err := rows.Scan(
 			&history.ID,
+			&history.PricingDate,
 			&history.GoldType,
 			&history.BuyPrice,
 			&history.SellPrice,
-			&history.Unit,
 			&history.Source,
 			&history.ScrapedAt,
 			&history.CreatedAt,
+			&history.UpdatedAt,
 		)
 
 		if err != nil {
@@ -225,7 +296,7 @@ func (r *GoldPricingHistoryRepository) GetLatest() ([]models.GoldPricingHistory,
 // GetByID retrieves a gold pricing history by ID
 func (r *GoldPricingHistoryRepository) GetByID(id int) (*models.GoldPricingHistory, error) {
 	query := `
-		SELECT id, gold_type, buy_price, sell_price, unit, source, scraped_at, created_at
+		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
 		FROM gold_pricing_histories
 		WHERE id = $1
 	`
@@ -233,13 +304,14 @@ func (r *GoldPricingHistoryRepository) GetByID(id int) (*models.GoldPricingHisto
 	var history models.GoldPricingHistory
 	err := r.db.QueryRow(query, id).Scan(
 		&history.ID,
+		&history.PricingDate,
 		&history.GoldType,
 		&history.BuyPrice,
 		&history.SellPrice,
-		&history.Unit,
 		&history.Source,
 		&history.ScrapedAt,
 		&history.CreatedAt,
+		&history.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -253,11 +325,56 @@ func (r *GoldPricingHistoryRepository) GetByID(id int) (*models.GoldPricingHisto
 	return &history, nil
 }
 
+// GetByDate retrieves all gold pricing histories for a specific date
+func (r *GoldPricingHistoryRepository) GetByDate(date time.Time) ([]models.GoldPricingHistory, error) {
+	query := `
+		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
+		FROM gold_pricing_histories
+		WHERE pricing_date = $1
+		ORDER BY gold_type ASC, source ASC
+	`
+
+	rows, err := r.db.Query(query, date)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query gold pricing histories by date: %w", err)
+	}
+	defer rows.Close()
+
+	histories := []models.GoldPricingHistory{}
+
+	for rows.Next() {
+		var history models.GoldPricingHistory
+		err := rows.Scan(
+			&history.ID,
+			&history.PricingDate,
+			&history.GoldType,
+			&history.BuyPrice,
+			&history.SellPrice,
+			&history.Source,
+			&history.ScrapedAt,
+			&history.CreatedAt,
+			&history.UpdatedAt,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		histories = append(histories, history)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return histories, nil
+}
+
 // DeleteOldRecords deletes records older than the specified number of days
 func (r *GoldPricingHistoryRepository) DeleteOldRecords(days int) (int64, error) {
 	query := `
 		DELETE FROM gold_pricing_histories
-		WHERE scraped_at < NOW() - INTERVAL '%d days'
+		WHERE pricing_date < CURRENT_DATE - INTERVAL '%d days'
 	`
 
 	result, err := r.db.Exec(fmt.Sprintf(query, days))
@@ -274,47 +391,83 @@ func (r *GoldPricingHistoryRepository) DeleteOldRecords(days int) (int64, error)
 }
 
 // GetStats returns statistics about the gold pricing histories
-func (r *GoldPricingHistoryRepository) GetStats() (map[string]interface{}, error) {
+func (r *GoldPricingHistoryRepository) GetStats() (*models.GoldPricingStats, error) {
 	query := `
 		SELECT 
 			COUNT(*) as total_records,
 			COUNT(DISTINCT gold_type) as unique_gold_types,
 			COUNT(DISTINCT source) as unique_sources,
-			MIN(scraped_at) as oldest_record,
-			MAX(scraped_at) as latest_record
+			MIN(pricing_date) as oldest_date,
+			MAX(pricing_date) as latest_date
 		FROM gold_pricing_histories
 	`
 
-	var totalRecords, uniqueGoldTypes, uniqueSources int
-	var oldestRecord, latestRecord sql.NullTime
+	var stats models.GoldPricingStats
+	var oldestDate, latestDate sql.NullTime
 
 	err := r.db.QueryRow(query).Scan(
-		&totalRecords,
-		&uniqueGoldTypes,
-		&uniqueSources,
-		&oldestRecord,
-		&latestRecord,
+		&stats.TotalRecords,
+		&stats.UniqueGoldTypes,
+		&stats.UniqueSources,
+		&oldestDate,
+		&latestDate,
 	)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stats: %w", err)
 	}
 
-	stats := map[string]interface{}{
-		"total_records":     totalRecords,
-		"unique_gold_types": uniqueGoldTypes,
-		"unique_sources":    uniqueSources,
-		"oldest_record":     nil,
-		"latest_record":     nil,
+	if oldestDate.Valid {
+		stats.OldestDate = oldestDate.Time
 	}
 
-	if oldestRecord.Valid {
-		stats["oldest_record"] = oldestRecord.Time
+	if latestDate.Valid {
+		stats.LatestDate = latestDate.Time
 	}
 
-	if latestRecord.Valid {
-		stats["latest_record"] = latestRecord.Time
+	return &stats, nil
+}
+
+// GetVendorList returns a list of all unique vendors
+func (r *GoldPricingHistoryRepository) GetVendorList() ([]string, error) {
+	query := `
+		SELECT DISTINCT source
+		FROM gold_pricing_histories
+		ORDER BY source
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query vendor list: %w", err)
+	}
+	defer rows.Close()
+
+	vendors := []string{}
+
+	for rows.Next() {
+		var vendor string
+		if err := rows.Scan(&vendor); err != nil {
+			return nil, fmt.Errorf("failed to scan vendor: %w", err)
+		}
+		vendors = append(vendors, vendor)
 	}
 
-	return stats, nil
+	return vendors, nil
+}
+
+// CheckDuplicates checks if a record already exists for the given date, type, and source
+func (r *GoldPricingHistoryRepository) CheckDuplicates(date time.Time, goldType string, source models.GoldSource) (bool, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM gold_pricing_histories
+		WHERE pricing_date = $1 AND gold_type = $2 AND source = $3
+	`
+
+	var count int
+	err := r.db.QueryRow(query, date, goldType, source).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check duplicates: %w", err)
+	}
+
+	return count > 0, nil
 }

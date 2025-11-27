@@ -96,6 +96,14 @@ func (s *GoldScraperService) ScrapeLogamMulia() (*ScrapeResult, error) {
 			sellPrice = cleanPrice(sellPrice)
 			unit = cleanText(unit)
 
+			// Filter: Only scrape "Emas Batangan" (gold bars)
+			// Skip jewelry, coins, and other products
+			goldTypeLower := strings.ToLower(goldType)
+			if !isGoldBar(goldTypeLower) {
+				log.Printf("⏭️  Skipping non-gold-bar item: %s", goldType)
+				return
+			}
+
 			// Only add if we have valid data
 			if goldType != "" && (buyPrice != "" || sellPrice != "") {
 				scrapedData = append(scrapedData, ScrapedGoldData{
@@ -125,16 +133,26 @@ func (s *GoldScraperService) ScrapeLogamMulia() (*ScrapeResult, error) {
 					unit = cleanText(cells[3])
 				}
 
-				if goldType != "" && goldType != "Jenis" && goldType != "Type" {
-					scrapedData = append(scrapedData, ScrapedGoldData{
-						GoldType:  goldType,
-						BuyPrice:  buyPrice,
-						SellPrice: sellPrice,
-						Unit:      unit,
-					})
-
-					log.Printf("✅ Scraped (alt): %s - Buy: %s, Sell: %s, Unit: %s", goldType, buyPrice, sellPrice, unit)
+				// Skip header rows
+				if goldType == "" || goldType == "Jenis" || goldType == "Type" {
+					return
 				}
+
+				// Filter: Only scrape gold bars
+				goldTypeLower := strings.ToLower(goldType)
+				if !isGoldBar(goldTypeLower) {
+					log.Printf("⏭️  Skipping non-gold-bar item (alt): %s", goldType)
+					return
+				}
+
+				scrapedData = append(scrapedData, ScrapedGoldData{
+					GoldType:  goldType,
+					BuyPrice:  buyPrice,
+					SellPrice: sellPrice,
+					Unit:      unit,
+				})
+
+				log.Printf("✅ Scraped (alt): %s - Buy: %s, Sell: %s, Unit: %s", goldType, buyPrice, sellPrice, unit)
 			}
 		})
 	})
@@ -210,18 +228,27 @@ func (s *GoldScraperService) SaveScrapedData(data []ScrapedGoldData, source mode
 
 	// Convert scraped data to create models
 	createData := make([]models.GoldPricingHistoryCreate, 0, len(data))
+	pricingDate := time.Now().Truncate(24 * time.Hour) // Today's date at midnight
+
 	for _, item := range data {
 		createData = append(createData, models.GoldPricingHistoryCreate{
-			GoldType:  item.GoldType,
-			BuyPrice:  item.BuyPrice,
-			SellPrice: item.SellPrice,
-			Unit:      item.Unit,
-			Source:    source,
+			PricingDate: pricingDate,
+			GoldType:    item.GoldType,
+			SellPrice:   item.SellPrice, // Buy price will be calculated as 94% of sell price
+			Source:      source,
 		})
 	}
 
-	// Save to database using batch insert
-	return s.repo.CreateBatch(createData)
+	// Save to database using batch insert (returns savedCount, updatedCount, error)
+	savedCount, updatedCount, err := s.repo.CreateBatch(createData)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("💾 Batch insert complete: %d new, %d updated", savedCount, updatedCount)
+
+	// Fetch the saved data to return
+	return s.repo.GetByDate(pricingDate)
 }
 
 // GetAllPrices retrieves all gold prices with optional filters
@@ -263,4 +290,64 @@ func cleanPrice(price string) string {
 	price = strings.ReplaceAll(price, ",", "")
 	price = strings.TrimSpace(price)
 	return price
+}
+
+// isGoldBar checks if the item is a gold bar (Emas Batangan)
+// Returns true for gold bars, false for jewelry, coins, and other products
+func isGoldBar(goldType string) bool {
+	goldType = strings.ToLower(goldType)
+
+	// Keywords that indicate it's NOT a gold bar (jewelry, coins, etc.)
+	excludeKeywords := []string{
+		"anting",      // earrings
+		"cincin",      // ring
+		"gelang",      // bracelet
+		"kalung",      // necklace
+		"liontin",     // pendant
+		"perhiasan",   // jewelry
+		"koin",        // coin
+		"dinar",       // dinar coin
+		"dirham",      // dirham coin
+		"medali",      // medal
+		"gift",        // gift items
+		"souvenir",    // souvenir
+		"hello kitty", // character items
+		"disney",      // character items
+	}
+
+	// Check if it contains any exclude keywords
+	for _, keyword := range excludeKeywords {
+		if strings.Contains(goldType, keyword) {
+			return false
+		}
+	}
+
+	// Keywords that indicate it IS a gold bar
+	includeKeywords := []string{
+		"batang",      // bar
+		"logam mulia", // logam mulia brand
+		"antam",       // antam brand
+		"ubs",         // ubs brand
+		"gram",        // weight indicator
+		"gr",          // weight indicator
+		"g ",          // weight indicator
+	}
+
+	// Check if it contains any include keywords
+	for _, keyword := range includeKeywords {
+		if strings.Contains(goldType, keyword) {
+			return true
+		}
+	}
+
+	// If it's just a number followed by gram/gr/g, it's likely a gold bar
+	// Examples: "1 gram", "5 gr", "10 g", "100 gram"
+	if strings.Contains(goldType, "gram") ||
+		strings.Contains(goldType, " gr") ||
+		strings.Contains(goldType, " g") {
+		return true
+	}
+
+	// Default: exclude if we're not sure
+	return false
 }
