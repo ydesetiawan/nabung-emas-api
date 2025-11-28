@@ -1,9 +1,7 @@
 package services
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -42,10 +40,10 @@ type GoldPrice struct {
 	ID          int          `json:"id,omitempty"`
 	PricingDate time.Time    `json:"pricing_date"`
 	GoldType    string       `json:"gold_type"`
+	BasePrice   int          `json:"base_price"`
 	BuyPrice    int          `json:"buy_price"`
 	SellPrice   int          `json:"sell_price"`
 	Source      Source       `json:"source"`
-	Description string       `json:"description"`
 	Category    GoldCategory `json:"category"`
 	CreatedAt   time.Time    `json:"created_at,omitempty"`
 	UpdatedAt   time.Time    `json:"updated_at,omitempty"`
@@ -123,26 +121,6 @@ func (s *AntamScraperService) extractPrices(doc *goquery.Document) ([]GoldPrice,
 	var prices []GoldPrice
 	pricingDate := s.getPricingDate()
 
-	// Look for price tables or cards
-	// The website likely uses a table or card layout for different gold types
-	doc.Find(".product-card, .price-item, tr.price-row, .gold-price-item").Each(func(i int, sel *goquery.Selection) {
-		price, err := s.parsePrice(sel, pricingDate)
-		if err == nil {
-			prices = append(prices, price)
-		}
-	})
-
-	log.Println(prices)
-
-	// Alternative: Look for JSON data in script tags
-	if len(prices) == 0 {
-		doc.Find("script[type='application/json'], script#__NEXT_DATA__").Each(func(i int, sel *goquery.Selection) {
-			jsonData := sel.Text()
-			extractedPrices := s.parseJSONData(jsonData, pricingDate)
-			prices = append(prices, extractedPrices...)
-		})
-	}
-
 	// Fallback: Parse table structure
 	if len(prices) == 0 {
 		prices = s.parseTableStructure(doc, pricingDate)
@@ -151,119 +129,50 @@ func (s *AntamScraperService) extractPrices(doc *goquery.Document) ([]GoldPrice,
 	return prices, nil
 }
 
-// parsePrice parses a single price element
-func (s *AntamScraperService) parsePrice(sel *goquery.Selection, pricingDate time.Time) (GoldPrice, error) {
-	var price GoldPrice
-
-	// Extract gold type (weight)
-	goldType := strings.TrimSpace(sel.Find(".weight, .gram, .product-name").First().Text())
-	if goldType == "" {
-		goldType, _ = sel.Attr("data-weight")
-	}
-
-	// Extract category from product name
-	productName := strings.TrimSpace(sel.Find(".product-title, .category-name").First().Text())
-	category := s.detectCategory(productName)
-
-	// Extract buy price (harga beli)
-	buyPriceStr := strings.TrimSpace(sel.Find(".buy-price, .harga-beli").First().Text())
-	buyPrice, err := s.parseRupiah(buyPriceStr)
-	if err != nil {
-		return price, fmt.Errorf("failed to parse buy price: %w", err)
-	}
-
-	// Extract sell price (harga jual)
-	sellPriceStr := strings.TrimSpace(sel.Find(".sell-price, .harga-jual").First().Text())
-	sellPrice, err := s.parseRupiah(sellPriceStr)
-	if err != nil {
-		return price, fmt.Errorf("failed to parse sell price: %w", err)
-	}
-
-	price = GoldPrice{
-		PricingDate: pricingDate,
-		GoldType:    goldType,
-		BuyPrice:    buyPrice,
-		SellPrice:   sellPrice,
-		Source:      SourceAntam,
-		Description: productName,
-		Category:    category,
-	}
-
-	return price, nil
-}
-
 // parseTableStructure parses traditional table structure
 func (s *AntamScraperService) parseTableStructure(doc *goquery.Document, pricingDate time.Time) []GoldPrice {
 	var prices []GoldPrice
+	var currentCategory GoldCategory = EmasBatangan // Default
 
-	log.Println("1111")
-	log.Println(doc)
+	doc.Find("table tbody tr").Each(func(i int, row *goquery.Selection) {
+		// Check if it's a category header (no tds, likely ths)
+		if row.Find("td").Length() == 0 {
+			headerText := strings.TrimSpace(row.Text())
+			// Filter out the main header row "Berat Harga Dasar ..."
+			if strings.Contains(strings.ToLower(headerText), "berat") {
+				return
+			}
 
-	doc.Find("table tbody tr, .price-table tr").Each(func(i int, row *goquery.Selection) {
+			if headerText != "" {
+				currentCategory = s.detectCategory(headerText)
+			}
+			return
+		}
+
 		cells := row.Find("td")
 		if cells.Length() < 3 {
 			return
 		}
 
 		goldType := strings.TrimSpace(cells.Eq(0).Text())
-		buyPriceStr := strings.TrimSpace(cells.Eq(1).Text())
+		basePriceStr := strings.TrimSpace(cells.Eq(1).Text())
 		sellPriceStr := strings.TrimSpace(cells.Eq(2).Text())
 
-		buyPrice, errBuy := s.parseRupiah(buyPriceStr)
+		basePrice, errBase := s.parseRupiah(basePriceStr)
 		sellPrice, errSell := s.parseRupiah(sellPriceStr)
 
-		if errBuy == nil && errSell == nil && goldType != "" {
+		if errBase == nil && errSell == nil && goldType != "" {
 			prices = append(prices, GoldPrice{
 				PricingDate: pricingDate,
 				GoldType:    goldType,
-				BuyPrice:    buyPrice,
+				BasePrice:   basePrice,
+				BuyPrice:    0,
 				SellPrice:   sellPrice,
 				Source:      SourceAntam,
-				Category:    EmasBatangan, // Default category
+				Category:    currentCategory,
 			})
 		}
 	})
-
-	return prices
-}
-
-// parseJSONData extracts prices from JSON data
-func (s *AntamScraperService) parseJSONData(jsonStr string, pricingDate time.Time) []GoldPrice {
-	var prices []GoldPrice
-
-	// Try to extract JSON object
-	var data map[string]interface{}
-	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
-		return prices
-	}
-
-	// Navigate through the JSON structure to find price data
-	// This is placeholder logic - adjust based on actual JSON structure
-	if products, ok := data["products"].([]interface{}); ok {
-		for _, item := range products {
-			if product, ok := item.(map[string]interface{}); ok {
-				price := GoldPrice{
-					PricingDate: pricingDate,
-					Source:      SourceAntam,
-					Category:    EmasBatangan,
-				}
-
-				if weight, ok := product["weight"].(string); ok {
-					price.GoldType = weight
-				}
-				if buyPrice, ok := product["buyPrice"].(float64); ok {
-					price.BuyPrice = int(buyPrice)
-				}
-				if sellPrice, ok := product["sellPrice"].(float64); ok {
-					price.SellPrice = int(sellPrice)
-				}
-
-				if price.GoldType != "" && price.BuyPrice > 0 && price.SellPrice > 0 {
-					prices = append(prices, price)
-				}
-			}
-		}
-	}
 
 	return prices
 }
