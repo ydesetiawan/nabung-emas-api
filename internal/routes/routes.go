@@ -31,6 +31,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	transactionService := services.NewTransactionService(transactionRepo, pocketRepo)
 	analyticsService := services.NewAnalyticsService(analyticsRepo, transactionRepo, pocketRepo)
 	settingsService := services.NewSettingsService(settingsRepo)
+	antamScraperService := services.NewAntamScraperService()
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -40,6 +41,7 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
+	goldScraperHandler := handlers.NewGoldScraperHandler(antamScraperService)
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(cfg, tokenBlacklistRepo)
@@ -119,6 +121,9 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 		settings.GET("", settingsHandler.Get)
 		settings.PATCH("", settingsHandler.Update)
 	}
+
+	// Gold Scraper routes
+	api.POST("/gold-scraper/scrape", goldScraperHandler.Scrape)
 
 	// Gold Price routes (can be public or protected based on requirements)
 	// goldPrice := api.Group("/gold-price")
