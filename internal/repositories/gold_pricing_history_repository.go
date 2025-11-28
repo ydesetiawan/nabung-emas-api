@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"nabung-emas-api/internal/models"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -20,37 +18,9 @@ func NewGoldPricingHistoryRepository(db *sql.DB) *GoldPricingHistoryRepository {
 }
 
 // calculateBuyPrice calculates the buy price as 94% of sell price (6% discount)
-func calculateBuyPrice(sellPrice string) string {
-	// Remove "Rp" and dots, keep only numbers
-	priceStr := strings.ReplaceAll(sellPrice, "Rp", "")
-	priceStr = strings.ReplaceAll(priceStr, ".", "")
-	priceStr = strings.TrimSpace(priceStr)
-
-	// Convert to float
-	price, err := strconv.ParseFloat(priceStr, 64)
-	if err != nil {
-		return sellPrice // Return original if parsing fails
-	}
-
+func calculateBuyPrice(sellPrice int64) int64 {
 	// Calculate 94% (6% discount)
-	buyPrice := price * 0.94
-
-	// Format back to string with Rp prefix
-	buyPriceInt := int64(buyPrice)
-	buyPriceStr := fmt.Sprintf("%d", buyPriceInt)
-
-	// Add thousand separators
-	var result strings.Builder
-	result.WriteString("Rp")
-
-	for i, digit := range buyPriceStr {
-		if i > 0 && (len(buyPriceStr)-i)%3 == 0 {
-			result.WriteString(".")
-		}
-		result.WriteRune(digit)
-	}
-
-	return result.String()
+	return int64(float64(sellPrice) * 0.94)
 }
 
 // Create inserts a new gold pricing history record with UPSERT logic
@@ -64,9 +34,8 @@ func (r *GoldPricingHistoryRepository) Create(data *models.GoldPricingHistoryCre
 		DO UPDATE SET 
 			buy_price = EXCLUDED.buy_price,
 			sell_price = EXCLUDED.sell_price,
-			scraped_at = CURRENT_TIMESTAMP,
 			updated_at = CURRENT_TIMESTAMP
-		RETURNING id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
+		RETURNING id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
 	`
 
 	var history models.GoldPricingHistory
@@ -84,7 +53,6 @@ func (r *GoldPricingHistoryRepository) Create(data *models.GoldPricingHistoryCre
 		&history.BuyPrice,
 		&history.SellPrice,
 		&history.Source,
-		&history.ScrapedAt,
 		&history.CreatedAt,
 		&history.UpdatedAt,
 	)
@@ -116,7 +84,6 @@ func (r *GoldPricingHistoryRepository) CreateBatch(data []models.GoldPricingHist
 		DO UPDATE SET 
 			buy_price = EXCLUDED.buy_price,
 			sell_price = EXCLUDED.sell_price,
-			scraped_at = CURRENT_TIMESTAMP,
 			updated_at = CURRENT_TIMESTAMP
 		RETURNING (xmax = 0) AS inserted
 	`
@@ -163,7 +130,7 @@ func (r *GoldPricingHistoryRepository) CreateBatch(data []models.GoldPricingHist
 // GetAll retrieves gold pricing histories with optional filters
 func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFilter) ([]models.GoldPricingHistory, error) {
 	query := `
-		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
+		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
 		FROM gold_pricing_histories
 		WHERE 1=1
 	`
@@ -229,7 +196,6 @@ func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFi
 			&history.BuyPrice,
 			&history.SellPrice,
 			&history.Source,
-			&history.ScrapedAt,
 			&history.CreatedAt,
 			&history.UpdatedAt,
 		)
@@ -252,7 +218,7 @@ func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFi
 func (r *GoldPricingHistoryRepository) GetLatest() ([]models.GoldPricingHistory, error) {
 	query := `
 		SELECT DISTINCT ON (gold_type, source) 
-			id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
+			id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
 		FROM gold_pricing_histories
 		ORDER BY gold_type, source, pricing_date DESC
 	`
@@ -274,7 +240,6 @@ func (r *GoldPricingHistoryRepository) GetLatest() ([]models.GoldPricingHistory,
 			&history.BuyPrice,
 			&history.SellPrice,
 			&history.Source,
-			&history.ScrapedAt,
 			&history.CreatedAt,
 			&history.UpdatedAt,
 		)
@@ -296,7 +261,7 @@ func (r *GoldPricingHistoryRepository) GetLatest() ([]models.GoldPricingHistory,
 // GetByID retrieves a gold pricing history by ID
 func (r *GoldPricingHistoryRepository) GetByID(id int) (*models.GoldPricingHistory, error) {
 	query := `
-		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
+		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
 		FROM gold_pricing_histories
 		WHERE id = $1
 	`
@@ -309,7 +274,6 @@ func (r *GoldPricingHistoryRepository) GetByID(id int) (*models.GoldPricingHisto
 		&history.BuyPrice,
 		&history.SellPrice,
 		&history.Source,
-		&history.ScrapedAt,
 		&history.CreatedAt,
 		&history.UpdatedAt,
 	)
@@ -328,7 +292,7 @@ func (r *GoldPricingHistoryRepository) GetByID(id int) (*models.GoldPricingHisto
 // GetByDate retrieves all gold pricing histories for a specific date
 func (r *GoldPricingHistoryRepository) GetByDate(date time.Time) ([]models.GoldPricingHistory, error) {
 	query := `
-		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, scraped_at, created_at, updated_at
+		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
 		FROM gold_pricing_histories
 		WHERE pricing_date = $1
 		ORDER BY gold_type ASC, source ASC
@@ -351,7 +315,6 @@ func (r *GoldPricingHistoryRepository) GetByDate(date time.Time) ([]models.GoldP
 			&history.BuyPrice,
 			&history.SellPrice,
 			&history.Source,
-			&history.ScrapedAt,
 			&history.CreatedAt,
 			&history.UpdatedAt,
 		)

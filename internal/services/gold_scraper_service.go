@@ -26,7 +26,6 @@ type ScrapedGoldData struct {
 	GoldType  string
 	BuyPrice  string
 	SellPrice string
-	Unit      string
 }
 
 // ScrapeResult represents the result of a scraping operation
@@ -83,7 +82,6 @@ func (s *GoldScraperService) ScrapeLogamMulia() (*ScrapeResult, error) {
 			goldType := strings.TrimSpace(row.ChildText("td:nth-child(1)"))
 			buyPrice := strings.TrimSpace(row.ChildText("td:nth-child(2)"))
 			sellPrice := strings.TrimSpace(row.ChildText("td:nth-child(3)"))
-			unit := strings.TrimSpace(row.ChildText("td:nth-child(4)"))
 
 			// Skip empty rows or header rows
 			if goldType == "" || goldType == "Jenis" || goldType == "Type" {
@@ -94,7 +92,6 @@ func (s *GoldScraperService) ScrapeLogamMulia() (*ScrapeResult, error) {
 			goldType = cleanText(goldType)
 			buyPrice = cleanPrice(buyPrice)
 			sellPrice = cleanPrice(sellPrice)
-			unit = cleanText(unit)
 
 			// Filter: Only scrape "Emas Batangan" (gold bars)
 			// Skip jewelry, coins, and other products
@@ -110,10 +107,9 @@ func (s *GoldScraperService) ScrapeLogamMulia() (*ScrapeResult, error) {
 					GoldType:  goldType,
 					BuyPrice:  buyPrice,
 					SellPrice: sellPrice,
-					Unit:      unit,
 				})
 
-				log.Printf("✅ Scraped: %s - Buy: %s, Sell: %s, Unit: %s", goldType, buyPrice, sellPrice, unit)
+				log.Printf("✅ Scraped: %s - Buy: %s, Sell: %s", goldType, buyPrice, sellPrice)
 			}
 		})
 	})
@@ -128,10 +124,6 @@ func (s *GoldScraperService) ScrapeLogamMulia() (*ScrapeResult, error) {
 				goldType := cleanText(cells[0])
 				buyPrice := cleanPrice(cells[1])
 				sellPrice := cleanPrice(cells[2])
-				unit := ""
-				if len(cells) >= 4 {
-					unit = cleanText(cells[3])
-				}
 
 				// Skip header rows
 				if goldType == "" || goldType == "Jenis" || goldType == "Type" {
@@ -149,10 +141,9 @@ func (s *GoldScraperService) ScrapeLogamMulia() (*ScrapeResult, error) {
 					GoldType:  goldType,
 					BuyPrice:  buyPrice,
 					SellPrice: sellPrice,
-					Unit:      unit,
 				})
 
-				log.Printf("✅ Scraped (alt): %s - Buy: %s, Sell: %s, Unit: %s", goldType, buyPrice, sellPrice, unit)
+				log.Printf("✅ Scraped (alt): %s - Buy: %s, Sell: %s", goldType, buyPrice, sellPrice)
 			}
 		})
 	})
@@ -231,10 +222,17 @@ func (s *GoldScraperService) SaveScrapedData(data []ScrapedGoldData, source mode
 	pricingDate := time.Now().Truncate(24 * time.Hour) // Today's date at midnight
 
 	for _, item := range data {
+		// Convert string price to int64
+		sellPrice, err := parsePrice(item.SellPrice)
+		if err != nil {
+			log.Printf("⚠️  Failed to parse sell price for %s: %v", item.GoldType, err)
+			continue
+		}
+
 		createData = append(createData, models.GoldPricingHistoryCreate{
 			PricingDate: pricingDate,
 			GoldType:    item.GoldType,
-			SellPrice:   item.SellPrice, // Buy price will be calculated as 94% of sell price
+			SellPrice:   sellPrice, // Buy price will be calculated as 94% of sell price
 			Source:      source,
 		})
 	}
@@ -290,6 +288,29 @@ func cleanPrice(price string) string {
 	price = strings.ReplaceAll(price, ",", "")
 	price = strings.TrimSpace(price)
 	return price
+}
+
+// parsePrice converts a price string to int64
+// Handles formats like "Rp1.234.567" or "1234567"
+func parsePrice(priceStr string) (int64, error) {
+	// Clean the price string
+	cleaned := cleanPrice(priceStr)
+
+	// Convert to int64
+	price, err := fmt.Sscanf(cleaned, "%d", new(int64))
+	if err != nil || price != 1 {
+		// Try alternative parsing
+		var result int64
+		_, err := fmt.Sscanf(cleaned, "%d", &result)
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse price '%s': %w", priceStr, err)
+		}
+		return result, nil
+	}
+
+	var result int64
+	fmt.Sscanf(cleaned, "%d", &result)
+	return result, nil
 }
 
 // isGoldBar checks if the item is a gold bar (Emas Batangan)

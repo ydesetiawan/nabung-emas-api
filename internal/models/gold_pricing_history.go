@@ -52,10 +52,9 @@ type GoldPricingHistory struct {
 	ID          int        `json:"id" db:"id"`
 	PricingDate time.Time  `json:"pricing_date" db:"pricing_date"`
 	GoldType    string     `json:"gold_type" db:"gold_type"`
-	BuyPrice    string     `json:"buy_price" db:"buy_price"`
-	SellPrice   string     `json:"sell_price" db:"sell_price"`
+	BuyPrice    int64      `json:"buy_price" db:"buy_price"`
+	SellPrice   int64      `json:"sell_price" db:"sell_price"`
 	Source      GoldSource `json:"source" db:"source"`
-	ScrapedAt   time.Time  `json:"scraped_at" db:"scraped_at"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
 }
@@ -64,15 +63,14 @@ type GoldPricingHistory struct {
 type GoldPricingHistoryCreate struct {
 	PricingDate time.Time  `json:"pricing_date" validate:"required"`
 	GoldType    string     `json:"gold_type" validate:"required"`
-	SellPrice   string     `json:"sell_price" validate:"required"`
+	SellPrice   int64      `json:"sell_price" validate:"required"`
 	Source      GoldSource `json:"source" validate:"required,oneof=antam usb"`
 }
 
 // CalculateBuyPrice calculates the buy price as 94% of sell price (6% discount)
-func (g *GoldPricingHistoryCreate) CalculateBuyPrice() string {
-	// This will be calculated in the repository layer
-	// For now, return empty string
-	return ""
+func (g *GoldPricingHistoryCreate) CalculateBuyPrice() int64 {
+	// Calculate 94% (6% discount)
+	return int64(float64(g.SellPrice) * 0.94)
 }
 
 // GoldPricingHistoryFilter represents filters for querying gold pricing histories
