@@ -242,20 +242,3 @@ func (s *AntamScraperService) getPricingDate() time.Time {
 	now := time.Now()
 	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 }
-
-// Example usage function
-func ExampleUsage() {
-	scraper := NewAntamScraperService()
-
-	prices, err := scraper.Scrape()
-	if err != nil {
-		fmt.Printf("Error scraping: %v\n", err)
-		return
-	}
-
-	fmt.Printf("Successfully scraped %d prices\n", len(prices))
-	for _, price := range prices {
-		fmt.Printf("Gold Type: %s, Buy: %d, Sell: %d, Category: %s\n",
-			price.GoldType, price.BuyPrice, price.SellPrice, price.Category)
-	}
-}
