@@ -65,15 +65,7 @@ CREATE TABLE transactions (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Gold Prices (for historical tracking)
-CREATE TABLE gold_prices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    date DATE NOT NULL,
-    price_per_gram DECIMAL(15, 2) NOT NULL,
-    source VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT unique_price_per_date_source UNIQUE(date, source)
-);
+
 
 -- User Settings
 CREATE TABLE user_settings (
@@ -98,7 +90,7 @@ CREATE INDEX idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX idx_transactions_pocket_id ON transactions(pocket_id);
 CREATE INDEX idx_transactions_date ON transactions(transaction_date);
 CREATE INDEX idx_transactions_brand ON transactions(brand);
-CREATE INDEX idx_gold_prices_date ON gold_prices(date);
+
 CREATE INDEX idx_password_reset_tokens_token ON password_reset_tokens(token);
 CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 
