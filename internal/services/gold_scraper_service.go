@@ -95,11 +95,11 @@ func (s *GoldScraperService) ScrapeLogamMulia() (*ScrapeResult, error) {
 
 			// Filter: Only scrape "Emas Batangan" (gold bars)
 			// Skip jewelry, coins, and other products
-			goldTypeLower := strings.ToLower(goldType)
-			if !isGoldBar(goldTypeLower) {
-				log.Printf("⏭️  Skipping non-gold-bar item: %s", goldType)
-				return
-			}
+			// goldTypeLower := strings.ToLower(goldType)
+			// if !isGoldBar(goldTypeLower) {
+			// 	log.Printf("⏭️  Skipping non-gold-bar item: %s", goldType)
+			// 	return
+			// }
 
 			// Only add if we have valid data
 			if goldType != "" && (buyPrice != "" || sellPrice != "") {

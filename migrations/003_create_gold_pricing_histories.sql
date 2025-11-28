@@ -5,6 +5,22 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
+-- Create enum type for gold category
+DO $$ BEGIN
+    CREATE TYPE gold_category AS ENUM (
+        'emas_batangan',
+        'emas_batangan_gift_series',
+        'emas_batangan_selamat_idul_fitri',
+        'emas_batangan_imlek',
+        'emas_batangan_batik_seri_iii',
+        'perak_murni',
+        'perak_heritage',
+        'liontin_batik_seri_iii'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
 -- Gold Pricing Histories table
 CREATE TABLE IF NOT EXISTS gold_pricing_histories (
     id SERIAL PRIMARY KEY,
@@ -13,6 +29,7 @@ CREATE TABLE IF NOT EXISTS gold_pricing_histories (
     buy_price BIGINT NOT NULL,
     sell_price BIGINT NOT NULL,
     source gold_source NOT NULL,
+    category gold_category DEFAULT 'emas_batangan',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(pricing_date, gold_type, source)
@@ -22,12 +39,14 @@ CREATE TABLE IF NOT EXISTS gold_pricing_histories (
 CREATE INDEX IF NOT EXISTS idx_gold_pricing_histories_pricing_date ON gold_pricing_histories(pricing_date DESC);
 CREATE INDEX IF NOT EXISTS idx_gold_pricing_histories_gold_type ON gold_pricing_histories(gold_type);
 CREATE INDEX IF NOT EXISTS idx_gold_pricing_histories_source ON gold_pricing_histories(source);
+CREATE INDEX IF NOT EXISTS idx_gold_pricing_histories_category ON gold_pricing_histories(category);
 
 -- Composite indexes
 CREATE INDEX IF NOT EXISTS idx_gold_pricing_histories_date_type ON gold_pricing_histories(pricing_date DESC, gold_type);
 CREATE INDEX IF NOT EXISTS idx_gold_pricing_histories_date_source ON gold_pricing_histories(pricing_date DESC, source);
 CREATE INDEX IF NOT EXISTS idx_gold_pricing_histories_type_source ON gold_pricing_histories(gold_type, source);
 CREATE INDEX IF NOT EXISTS idx_gold_pricing_histories_latest ON gold_pricing_histories(gold_type, source, pricing_date DESC);
+CREATE INDEX IF NOT EXISTS idx_gold_pricing_histories_category_date ON gold_pricing_histories(category, pricing_date DESC);
 
 -- Create trigger function for updated_at
 CREATE OR REPLACE FUNCTION update_gold_pricing_histories_updated_at()
@@ -51,3 +70,4 @@ COMMENT ON COLUMN gold_pricing_histories.gold_type IS 'Type/weight of gold (e.g.
 COMMENT ON COLUMN gold_pricing_histories.buy_price IS 'Buyback price in Rupiah (calculated as 94% of sell price)';
 COMMENT ON COLUMN gold_pricing_histories.sell_price IS 'Selling price in Rupiah from the source';
 COMMENT ON COLUMN gold_pricing_histories.source IS 'Source of the pricing data (antam, usb)';
+COMMENT ON COLUMN gold_pricing_histories.category IS 'Category of gold/silver product';

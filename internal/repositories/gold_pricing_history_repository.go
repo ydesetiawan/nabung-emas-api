@@ -27,15 +27,22 @@ func calculateBuyPrice(sellPrice int64) int64 {
 func (r *GoldPricingHistoryRepository) Create(data *models.GoldPricingHistoryCreate) (*models.GoldPricingHistory, error) {
 	buyPrice := calculateBuyPrice(data.SellPrice)
 
+	// Set default category if not provided
+	category := data.Category
+	if category == "" {
+		category = models.GoldCategoryEmasBatangan
+	}
+
 	query := `
-		INSERT INTO gold_pricing_histories (pricing_date, gold_type, buy_price, sell_price, source)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO gold_pricing_histories (pricing_date, gold_type, buy_price, sell_price, source, category)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (pricing_date, gold_type, source) 
 		DO UPDATE SET 
 			buy_price = EXCLUDED.buy_price,
 			sell_price = EXCLUDED.sell_price,
+			category = EXCLUDED.category,
 			updated_at = CURRENT_TIMESTAMP
-		RETURNING id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
+		RETURNING id, pricing_date, gold_type, buy_price, sell_price, source, category, created_at, updated_at
 	`
 
 	var history models.GoldPricingHistory
@@ -46,6 +53,7 @@ func (r *GoldPricingHistoryRepository) Create(data *models.GoldPricingHistoryCre
 		buyPrice,
 		data.SellPrice,
 		data.Source,
+		category,
 	).Scan(
 		&history.ID,
 		&history.PricingDate,
@@ -53,6 +61,7 @@ func (r *GoldPricingHistoryRepository) Create(data *models.GoldPricingHistoryCre
 		&history.BuyPrice,
 		&history.SellPrice,
 		&history.Source,
+		&history.Category,
 		&history.CreatedAt,
 		&history.UpdatedAt,
 	)
@@ -78,12 +87,13 @@ func (r *GoldPricingHistoryRepository) CreateBatch(data []models.GoldPricingHist
 	defer tx.Rollback()
 
 	query := `
-		INSERT INTO gold_pricing_histories (pricing_date, gold_type, buy_price, sell_price, source)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO gold_pricing_histories (pricing_date, gold_type, buy_price, sell_price, source, category)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (pricing_date, gold_type, source) 
 		DO UPDATE SET 
 			buy_price = EXCLUDED.buy_price,
 			sell_price = EXCLUDED.sell_price,
+			category = EXCLUDED.category,
 			updated_at = CURRENT_TIMESTAMP
 		RETURNING (xmax = 0) AS inserted
 	`
@@ -100,6 +110,12 @@ func (r *GoldPricingHistoryRepository) CreateBatch(data []models.GoldPricingHist
 	for _, item := range data {
 		buyPrice := calculateBuyPrice(item.SellPrice)
 
+		// Set default category if not provided
+		category := item.Category
+		if category == "" {
+			category = models.GoldCategoryEmasBatangan
+		}
+
 		var inserted bool
 		err := stmt.QueryRow(
 			item.PricingDate,
@@ -107,6 +123,7 @@ func (r *GoldPricingHistoryRepository) CreateBatch(data []models.GoldPricingHist
 			buyPrice,
 			item.SellPrice,
 			item.Source,
+			category,
 		).Scan(&inserted)
 
 		if err != nil {
@@ -130,7 +147,7 @@ func (r *GoldPricingHistoryRepository) CreateBatch(data []models.GoldPricingHist
 // GetAll retrieves gold pricing histories with optional filters
 func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFilter) ([]models.GoldPricingHistory, error) {
 	query := `
-		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
+		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, category, created_at, updated_at
 		FROM gold_pricing_histories
 		WHERE 1=1
 	`
@@ -148,6 +165,12 @@ func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFi
 	if filter.Source != "" {
 		query += fmt.Sprintf(" AND source = $%d", argCount)
 		args = append(args, filter.Source)
+		argCount++
+	}
+
+	if filter.Category != "" {
+		query += fmt.Sprintf(" AND category = $%d", argCount)
+		args = append(args, filter.Category)
 		argCount++
 	}
 
@@ -196,6 +219,7 @@ func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFi
 			&history.BuyPrice,
 			&history.SellPrice,
 			&history.Source,
+			&history.Category,
 			&history.CreatedAt,
 			&history.UpdatedAt,
 		)
@@ -218,7 +242,7 @@ func (r *GoldPricingHistoryRepository) GetAll(filter models.GoldPricingHistoryFi
 func (r *GoldPricingHistoryRepository) GetLatest() ([]models.GoldPricingHistory, error) {
 	query := `
 		SELECT DISTINCT ON (gold_type, source) 
-			id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
+			id, pricing_date, gold_type, buy_price, sell_price, source, category, created_at, updated_at
 		FROM gold_pricing_histories
 		ORDER BY gold_type, source, pricing_date DESC
 	`
@@ -240,6 +264,7 @@ func (r *GoldPricingHistoryRepository) GetLatest() ([]models.GoldPricingHistory,
 			&history.BuyPrice,
 			&history.SellPrice,
 			&history.Source,
+			&history.Category,
 			&history.CreatedAt,
 			&history.UpdatedAt,
 		)
@@ -261,7 +286,7 @@ func (r *GoldPricingHistoryRepository) GetLatest() ([]models.GoldPricingHistory,
 // GetByID retrieves a gold pricing history by ID
 func (r *GoldPricingHistoryRepository) GetByID(id int) (*models.GoldPricingHistory, error) {
 	query := `
-		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
+		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, category, created_at, updated_at
 		FROM gold_pricing_histories
 		WHERE id = $1
 	`
@@ -274,6 +299,7 @@ func (r *GoldPricingHistoryRepository) GetByID(id int) (*models.GoldPricingHisto
 		&history.BuyPrice,
 		&history.SellPrice,
 		&history.Source,
+		&history.Category,
 		&history.CreatedAt,
 		&history.UpdatedAt,
 	)
@@ -292,7 +318,7 @@ func (r *GoldPricingHistoryRepository) GetByID(id int) (*models.GoldPricingHisto
 // GetByDate retrieves all gold pricing histories for a specific date
 func (r *GoldPricingHistoryRepository) GetByDate(date time.Time) ([]models.GoldPricingHistory, error) {
 	query := `
-		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, created_at, updated_at
+		SELECT id, pricing_date, gold_type, buy_price, sell_price, source, category, created_at, updated_at
 		FROM gold_pricing_histories
 		WHERE pricing_date = $1
 		ORDER BY gold_type ASC, source ASC
@@ -315,6 +341,7 @@ func (r *GoldPricingHistoryRepository) GetByDate(date time.Time) ([]models.GoldP
 			&history.BuyPrice,
 			&history.SellPrice,
 			&history.Source,
+			&history.Category,
 			&history.CreatedAt,
 			&history.UpdatedAt,
 		)
