@@ -9,7 +9,8 @@ CREATE TABLE gold_pricing_histories (
     source VARCHAR(50) NOT NULL,
     category VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_pricing_history UNIQUE(pricing_date, source, gold_type, category)
 );
 
 -- Add indexes for common queries

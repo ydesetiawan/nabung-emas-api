@@ -85,8 +85,15 @@ func (r *GoldPricingHistoryRepository) BulkCreate(prices []models.GoldPricingHis
 
 	query += strings.Join(placeholders, ",")
 
-	// Optional: Add ON CONFLICT clause if you want to update existing records
-	// query += ` ON CONFLICT (pricing_date, source, gold_type, category) DO UPDATE SET ...`
+	query += `
+		ON CONFLICT (pricing_date, source, gold_type, category) 
+		DO UPDATE SET 
+			base_price = EXCLUDED.base_price,
+			buy_price = EXCLUDED.buy_price,
+			sell_price = EXCLUDED.sell_price,
+			include_tax = EXCLUDED.include_tax,
+			updated_at = EXCLUDED.updated_at
+	`
 
 	_, err := r.db.Exec(query, values...)
 	return err

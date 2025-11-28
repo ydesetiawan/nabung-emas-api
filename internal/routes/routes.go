@@ -21,7 +21,9 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	pocketRepo := repositories.NewPocketRepository(db)
 	transactionRepo := repositories.NewTransactionRepository(db)
 	analyticsRepo := repositories.NewAnalyticsRepository(db)
+
 	settingsRepo := repositories.NewSettingsRepository(db)
+	goldPricingHistoryRepo := repositories.NewGoldPricingHistoryRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, tokenBlacklistRepo, cfg)
@@ -41,7 +43,8 @@ func Setup(e *echo.Echo, db *sql.DB, cfg *config.Config) {
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
-	goldScraperHandler := handlers.NewGoldScraperHandler(antamScraperService)
+
+	goldScraperHandler := handlers.NewGoldScraperHandler(antamScraperService, goldPricingHistoryRepo)
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(cfg, tokenBlacklistRepo)
