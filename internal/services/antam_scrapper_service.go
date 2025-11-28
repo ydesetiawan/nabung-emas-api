@@ -8,46 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"nabung-emas-api/internal/models"
+
 	"github.com/PuerkitoBio/goquery"
 )
-
-// GoldCategory represents the category enum
-type GoldCategory string
-
-const (
-	EmasBatangan                 GoldCategory = "emas_batangan"
-	EmasBatanganGiftSeries       GoldCategory = "emas_batangan_gift_series"
-	EmasBatanganSelamatIdulFitri GoldCategory = "emas_batangan_selamat_idul_fitri"
-	EmasBatanganImlek            GoldCategory = "emas_batangan_imlek"
-	EmasBatanganBatikSeriIII     GoldCategory = "emas_batangan_batik_seri_iii"
-	PerakMurni                   GoldCategory = "perak_murni"
-	PerakHeritage                GoldCategory = "perak_heritage"
-	LontinBatikSeriIII           GoldCategory = "liontin_batik_seri_iii"
-)
-
-// Source represents the source enum
-type Source string
-
-const (
-	SourceAntam     Source = "antam"
-	SourceUBS       Source = "ubs"
-	SourceGalery24  Source = "galery24"
-	SourcePegadaian Source = "pegadaian"
-)
-
-// GoldPrice represents a gold price record
-type GoldPrice struct {
-	ID          int          `json:"id,omitempty"`
-	PricingDate time.Time    `json:"pricing_date"`
-	GoldType    string       `json:"gold_type"`
-	BasePrice   int          `json:"base_price"`
-	BuyPrice    int          `json:"buy_price"`
-	SellPrice   int          `json:"sell_price"`
-	Source      Source       `json:"source"`
-	Category    GoldCategory `json:"category"`
-	CreatedAt   time.Time    `json:"created_at,omitempty"`
-	UpdatedAt   time.Time    `json:"updated_at,omitempty"`
-}
 
 // AntamScraper handles scraping from Logam Mulia website
 type AntamScraperService struct {
@@ -68,7 +32,7 @@ func NewAntamScraperService() *AntamScraperService {
 }
 
 // Scrape fetches and parses gold prices from Logam Mulia website
-func (s *AntamScraperService) Scrape() ([]GoldPrice, error) {
+func (s *AntamScraperService) Scrape() ([]models.GoldPricingHistory, error) {
 	// Create request
 	req, err := http.NewRequest("GET", s.BaseURL, nil)
 	if err != nil {
@@ -117,8 +81,8 @@ func (s *AntamScraperService) Scrape() ([]GoldPrice, error) {
 }
 
 // extractPrices extracts gold prices from the HTML document
-func (s *AntamScraperService) extractPrices(doc *goquery.Document) ([]GoldPrice, error) {
-	var prices []GoldPrice
+func (s *AntamScraperService) extractPrices(doc *goquery.Document) ([]models.GoldPricingHistory, error) {
+	var prices []models.GoldPricingHistory
 	pricingDate := s.getPricingDate()
 
 	// Fallback: Parse table structure
@@ -130,9 +94,9 @@ func (s *AntamScraperService) extractPrices(doc *goquery.Document) ([]GoldPrice,
 }
 
 // parseTableStructure parses traditional table structure
-func (s *AntamScraperService) parseTableStructure(doc *goquery.Document, pricingDate time.Time) []GoldPrice {
-	var prices []GoldPrice
-	var currentCategory GoldCategory = EmasBatangan // Default
+func (s *AntamScraperService) parseTableStructure(doc *goquery.Document, pricingDate time.Time) []models.GoldPricingHistory {
+	var prices []models.GoldPricingHistory
+	var currentCategory models.GoldCategory = models.EmasBatangan // Default
 
 	doc.Find("table tbody tr").Each(func(i int, row *goquery.Selection) {
 		// Check if it's a category header (no tds, likely ths)
@@ -162,13 +126,14 @@ func (s *AntamScraperService) parseTableStructure(doc *goquery.Document, pricing
 		sellPrice, errSell := s.parseRupiah(sellPriceStr)
 
 		if errBase == nil && errSell == nil && goldType != "" {
-			prices = append(prices, GoldPrice{
+			prices = append(prices, models.GoldPricingHistory{
 				PricingDate: pricingDate,
 				GoldType:    goldType,
 				BasePrice:   basePrice,
 				BuyPrice:    0,
 				SellPrice:   sellPrice,
-				Source:      SourceAntam,
+				IncludeTax:  true,
+				Source:      models.SourceAntam,
 				Category:    currentCategory,
 			})
 		}
@@ -214,26 +179,26 @@ func (s *AntamScraperService) parseRupiah(priceStr string) (int, error) {
 }
 
 // detectCategory determines the category based on product name
-func (s *AntamScraperService) detectCategory(productName string) GoldCategory {
+func (s *AntamScraperService) detectCategory(productName string) models.GoldCategory {
 	productName = strings.ToLower(productName)
 
 	switch {
 	case strings.Contains(productName, "gift series"):
-		return EmasBatanganGiftSeries
+		return models.EmasBatanganGiftSeries
 	case strings.Contains(productName, "idul fitri"), strings.Contains(productName, "selamat"):
-		return EmasBatanganSelamatIdulFitri
+		return models.EmasBatanganSelamatIdulFitri
 	case strings.Contains(productName, "imlek"):
-		return EmasBatanganImlek
+		return models.EmasBatanganImlek
 	case strings.Contains(productName, "batik seri iii"), strings.Contains(productName, "batik seri 3"):
-		return EmasBatanganBatikSeriIII
+		return models.EmasBatanganBatikSeriIII
 	case strings.Contains(productName, "perak murni"):
-		return PerakMurni
+		return models.PerakMurni
 	case strings.Contains(productName, "heritage"):
-		return PerakHeritage
+		return models.PerakHeritage
 	case strings.Contains(productName, "liontin batik"):
-		return LontinBatikSeriIII
+		return models.LontinBatikSeriIII
 	default:
-		return EmasBatangan
+		return models.EmasBatangan
 	}
 }
 
